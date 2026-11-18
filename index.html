@@ -418,17 +418,15 @@
 
   <script>
     // =========================================================================
-    // إعدادات الاتصال بـ Supabase (استبدل القيمتين التاليتين ببيانات مشروعك)
+    // تم ربط المشروع بـ Supabase بنجاح عبر مفاتيحك المباشرة
     // =========================================================================
-    const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
-    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_PUBLIC_KEY';
+    const SUPABASE_URL = 'https://ccuhfrypornwaddnjgyn.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_IgVRCAIGLGJX4NYdUgtC3A_mYYmN5mv';
 
     let supabaseClient = null;
     let isCloudConnected = false;
 
     const LOCAL_KEYS = {
-      REPORTS: 'sabra_fallback_reports_v2',
-      ANNOUNCEMENTS: 'sabra_fallback_ann_v2',
       ADMIN_AUTH: 'sabra_admin_logged_in'
     };
 
@@ -441,39 +439,22 @@
     async function initApp() {
       const badge = document.getElementById('db-status-badge');
 
-      if (SUPABASE_URL.includes('YOUR_PROJECT_ID') || SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')) {
-        badge.textContent = 'وضع محلي (أضف مفاتيح Supabase)';
-        badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--amber-soft)] text-[var(--amber)]';
-        loadLocalFallback();
-      } else {
-        try {
-          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          await fetchAllFromSupabase();
-          setupRealtimeSubscription();
-          isCloudConnected = true;
-          badge.textContent = 'متصل سحابياً (مباشر)';
-          badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--green)] text-white';
-        } catch (err) {
-          console.error(err);
-          badge.textContent = 'تعذر الاتصال السحابي';
-          loadLocalFallback();
-        }
+      try {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        await fetchAllFromSupabase();
+        setupRealtimeSubscription();
+        isCloudConnected = true;
+        badge.textContent = 'متصل سحابياً (مباشر)';
+        badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--green)] text-white';
+      } catch (err) {
+        console.error(err);
+        badge.textContent = 'تعذر الاتصال السحابي';
+        badge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[var(--red-soft)] text-[var(--red)]';
       }
 
       if (sessionStorage.getItem(LOCAL_KEYS.ADMIN_AUTH) === 'true') {
         switchPortal('admin');
       }
-    }
-
-    function loadLocalFallback() {
-      reports = JSON.parse(localStorage.getItem(LOCAL_KEYS.REPORTS) || '[]');
-      announcements = JSON.parse(localStorage.getItem(LOCAL_KEYS.ANNOUNCEMENTS) || '[]');
-      updateAllViews();
-    }
-
-    function saveLocalFallback() {
-      localStorage.setItem(LOCAL_KEYS.REPORTS, JSON.stringify(reports));
-      localStorage.setItem(LOCAL_KEYS.ANNOUNCEMENTS, JSON.stringify(announcements));
     }
 
     // جلب كافة البيانات من Supabase
@@ -493,7 +474,7 @@
       updateAllViews();
     }
 
-    // الاستماع اللحظي للتغييرات بين جميع الأجهزة
+    // الاستماع اللحظي للتغييرات بين جميع الأجهزة (Realtime)
     function setupRealtimeSubscription() {
       if (!supabaseClient) return;
 
@@ -540,9 +521,7 @@
           if (error) throw error;
           await fetchAllFromSupabase();
         } else {
-          reports.unshift(newReport);
-          saveLocalFallback();
-          updateAllViews();
+          throw new Error('غير متصل بقاعدة البيانات');
         }
 
         document.getElementById('report-form').reset();
@@ -555,14 +534,14 @@
         showToast(`تم إرسال البلاغ بنجاح • الرقم المرجعي: ${newReport.id}`, 'success');
       } catch (err) {
         console.error(err);
-        showToast('حدث خطأ أثناء الإرسال، تأكد من إعدادات Supabase', 'error');
+        showToast('حدث خطأ أثناء الإرسال، تحقق من الاتصال', 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = 'إرسال البلاغ إلى مصالح بلدية صبرة';
       }
     }
 
-    // تحديث حالة البلاغ
+    // تحديث حالة البلاغ من طرف الإدارة
     async function updateReportStatus(id, newStatus) {
       const item = reports.find(r => r.id === id);
       if (!item) return;
@@ -579,11 +558,6 @@
             .eq('id', id);
           if (error) throw error;
           await fetchAllFromSupabase();
-        } else {
-          item.status = newStatus;
-          item.admin_note = updatedNote;
-          saveLocalFallback();
-          updateAllViews();
         }
         showToast(`تم تحديث حالة البلاغ ${id} إلى "${newStatus}"`, 'success');
       } catch (err) {
@@ -605,11 +579,6 @@
             .eq('id', id);
           if (error) throw error;
           await fetchAllFromSupabase();
-        } else {
-          const item = reports.find(r => r.id === id);
-          if (item) item.admin_note = noteText;
-          saveLocalFallback();
-          updateAllViews();
         }
         showToast('تم حفظ ونشر رد البلدية للمواطنين', 'info');
       } catch (err) {
@@ -624,10 +593,6 @@
           const { error } = await supabaseClient.from('sabra_reports').delete().eq('id', id);
           if (error) throw error;
           await fetchAllFromSupabase();
-        } else {
-          reports = reports.filter(r => r.id !== id);
-          saveLocalFallback();
-          updateAllViews();
         }
         showToast('تم حذف البلاغ', 'info');
       } catch (err) {
@@ -654,10 +619,6 @@
           const { error } = await supabaseClient.from('sabra_announcements').insert([newAnn]);
           if (error) throw error;
           await fetchAllFromSupabase();
-        } else {
-          announcements.unshift(newAnn);
-          saveLocalFallback();
-          updateAllViews();
         }
         e.target.reset();
         showToast('تم نشر الإعلان في فضاء المواطن بنجاح', 'success');
@@ -672,10 +633,6 @@
           const { error } = await supabaseClient.from('sabra_announcements').delete().eq('id', id);
           if (error) throw error;
           await fetchAllFromSupabase();
-        } else {
-          announcements = announcements.filter(a => a.id !== id);
-          saveLocalFallback();
-          updateAllViews();
         }
         showToast('تم حذف الإعلان', 'info');
       } catch (err) {
@@ -782,7 +739,6 @@
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function (e) {
-        // ضغط الصورة خفيفاً لتسريع رفعها إلى قاعدة البيانات
         const img = new Image();
         img.onload = function () {
           const canvas = document.createElement('canvas');
